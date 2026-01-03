@@ -1,0 +1,84 @@
+name: Sync and Build Factory
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    outputs:
+      new_tag: ${{ steps.check_tag.outputs.new_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "Build Factory Bot"
+          git config user.email "bot@buildfactory.local"
+
+      - name: Check and Sync Upstream Tags
+        id: check_tag
+        run: |
+          git remote add upstream https://github.com/containers/prometheus-podman-exporter.git
+          git fetch upstream --tags
+
+          LATEST_UPSTREAM=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
+          
+          if git rev-parse "$LATEST_UPSTREAM" >/dev/null 2>&1; then
+            echo "new_tag=false" >> $GITHUB_OUTPUT
+          else
+            echo "new_tag=true" >> $GITHUB_OUTPUT
+            git tag "$LATEST_UPSTREAM" upstream/"$LATEST_UPSTREAM"
+            git push origin "$LATEST_UPSTREAM"
+          fi
+
+  build-and-release:
+    needs: sync-upstream
+    if: |
+      always() && 
+      (github.event_name == 'push' || needs.sync-upstream.outputs.new_tag == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.7'
+
+      - name: Build and Package Binaries
+        run: |
+          # Build static binaries for both architectures
+          make binary-remote-amd64
+          make binary-remote-arm64
+          
+          mkdir -p dist
+          
+          # Package AMD64
+          cp bin/remote/prometheus-podman-exporter-amd64 podman_exporter
+          tar -czvf dist/podman_exporter-linux-amd64.tar.gz podman_exporter LICENSE
+          
+          # Package ARM64
+          cp bin/remote/prometheus-podman-exporter-arm64 podman_exporter
+          tar -czvf dist/podman_exporter-linux-arm64.tar.gz podman_exporter LICENSE
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
