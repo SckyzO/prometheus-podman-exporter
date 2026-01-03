@@ -17,6 +17,7 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     outputs:
       new_tag: ${{ steps.check_tag.outputs.new_tag }}
+      tag_name: ${{ steps.check_tag.outputs.tag_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,6 +41,7 @@ jobs:
             echo "new_tag=false" >> $GITHUB_OUTPUT
           else
             echo "new_tag=true" >> $GITHUB_OUTPUT
+            echo "tag_name=$LATEST_UPSTREAM" >> $GITHUB_OUTPUT
             git tag "$LATEST_UPSTREAM" upstream/"$LATEST_UPSTREAM"
             git push origin "$LATEST_UPSTREAM"
           fi
@@ -53,6 +55,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.sync-upstream.outputs.tag_name || github.ref_name }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
