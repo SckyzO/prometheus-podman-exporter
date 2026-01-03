@@ -66,15 +66,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Switch to Tag
+      - name: Checkout and Build Target
         run: |
           TAG_NAME="${{ needs.sync-upstream.outputs.tag_name }}"
-          if [ -n "$TAG_NAME" ]; then
-            echo "Checking out tag: $TAG_NAME"
-            git checkout "$TAG_NAME"
-          else
-            echo "No tag specified, using default branch."
+          
+          if [ -z "$TAG_NAME" ]; then
+            echo "Error: No tag name provided."
+            exit 1
           fi
+
+          echo "Preparing to build tag: $TAG_NAME"
+          
+          # Add upstream to ensure we have the source of truth
+          git remote add upstream https://github.com/containers/prometheus-podman-exporter.git || true
+          
+          # Fetch specifically the tag we want to build
+          echo "Fetching tag $TAG_NAME from upstream..."
+          git fetch upstream tag "$TAG_NAME"
+          
+          # Checkout the tag forcefully (overwriting current workflow file if it doesn't exist in tag)
+          echo "Checking out $TAG_NAME..."
+          git checkout -f "$TAG_NAME"
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -102,5 +114,6 @@ jobs:
         with:
           files: dist/*.tar.gz
           make_latest: true
+          tag_name: ${{ needs.sync-upstream.outputs.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
