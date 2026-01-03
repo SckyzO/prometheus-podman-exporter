@@ -37,11 +37,15 @@ jobs:
 
           LATEST_UPSTREAM=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
           
+          # Always export the tag name so the build job knows what to checkout
+          echo "tag_name=$LATEST_UPSTREAM" >> $GITHUB_OUTPUT
+
           if git rev-parse "$LATEST_UPSTREAM" >/dev/null 2>&1; then
+            echo "Tag $LATEST_UPSTREAM already exists."
             echo "new_tag=false" >> $GITHUB_OUTPUT
           else
+            echo "New tag found: $LATEST_UPSTREAM"
             echo "new_tag=true" >> $GITHUB_OUTPUT
-            echo "tag_name=$LATEST_UPSTREAM" >> $GITHUB_OUTPUT
             git tag "$LATEST_UPSTREAM" upstream/"$LATEST_UPSTREAM"
             git push origin "$LATEST_UPSTREAM"
           fi
@@ -50,7 +54,11 @@ jobs:
     needs: sync-upstream
     if: |
       always() && 
-      (github.event_name == 'push' || needs.sync-upstream.outputs.new_tag == 'true')
+      (
+        github.event_name == 'push' || 
+        needs.sync-upstream.outputs.new_tag == 'true' ||
+        github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
