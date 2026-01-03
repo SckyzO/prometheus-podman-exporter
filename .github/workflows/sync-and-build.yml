@@ -64,7 +64,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.sync-upstream.outputs.tag_name || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Switch to Tag
+        run: |
+          TAG_NAME="${{ needs.sync-upstream.outputs.tag_name }}"
+          if [ -n "$TAG_NAME" ]; then
+            echo "Checking out tag: $TAG_NAME"
+            git checkout "$TAG_NAME"
+          else
+            echo "No tag specified, using default branch."
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@v5
