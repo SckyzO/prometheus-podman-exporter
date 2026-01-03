@@ -141,6 +141,29 @@ jobs:
           
           ls -l dist/
 
+      - name: Fetch Upstream Release Notes
+        id: upstream_notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${{ needs.sync-upstream.outputs.tag_name }}"
+          echo "Fetching release notes for $TAG_NAME from upstream..."
+          
+          # Try to fetch upstream release notes
+          # We use || true to prevent failure if upstream release doesn't exist yet
+          gh release view "$TAG_NAME" \
+            --repo containers/prometheus-podman-exporter \
+            --json body \
+            --jq .body > RELEASE_NOTES.md || echo "" > RELEASE_NOTES.md
+          
+          # If empty, add a default header
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "Automated build from upstream tag $TAG_NAME" > RELEASE_NOTES.md
+          else
+             # Prepend a header
+             sed -i "1s/^/## Upstream Release Notes\n\n/" RELEASE_NOTES.md
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -150,5 +173,7 @@ jobs:
             dist/*.deb
           make_latest: true
           tag_name: ${{ needs.sync-upstream.outputs.tag_name }}
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
