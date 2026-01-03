@@ -110,17 +110,17 @@ jobs:
           # Restore nFPM config
           cp /tmp/nfpm.yaml .
           
-          # Extract version from tag (remove 'v' prefix)
-          VERSION="${{ needs.sync-upstream.outputs.tag_name }}"
-          VERSION="${VERSION#v}"
+          # Versioning
+          TAG="${{ needs.sync-upstream.outputs.tag_name }}"
+          VERSION="${TAG#v}"
           export VERSION
           
           # --- AMD64 ---
           echo "Packaging AMD64..."
           cp bin/remote/prometheus-podman-exporter-amd64 podman_exporter
           
-          # Tarball
-          tar -czvf dist/podman_exporter-linux-amd64.tar.gz podman_exporter LICENSE
+          # Tarball (Specific naming: prometheus-podman-exporter-vX.Y.Z.linux-amd64.tar.gz)
+          tar -czvf "dist/prometheus-podman-exporter-${TAG}.linux-amd64.tar.gz" podman_exporter LICENSE
           
           # DEB/RPM
           export ARCH=amd64
@@ -131,8 +131,8 @@ jobs:
           echo "Packaging ARM64..."
           cp bin/remote/prometheus-podman-exporter-arm64 podman_exporter
           
-          # Tarball
-          tar -czvf dist/podman_exporter-linux-arm64.tar.gz podman_exporter LICENSE
+          # Tarball (Specific naming: prometheus-podman-exporter-vX.Y.Z.linux-arm64.tar.gz)
+          tar -czvf "dist/prometheus-podman-exporter-${TAG}.linux-arm64.tar.gz" podman_exporter LICENSE
           
           # DEB/RPM
           export ARCH=arm64
