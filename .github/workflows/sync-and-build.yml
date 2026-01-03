@@ -33,7 +33,7 @@ jobs:
         id: check_tag
         run: |
           git remote add upstream https://github.com/containers/prometheus-podman-exporter.git
-          git fetch upstream --tags
+          git fetch upstream --tags --force
 
           LATEST_UPSTREAM=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
           
@@ -85,7 +85,7 @@ jobs:
           
           # Fetch specifically the tag we want to build
           echo "Fetching tag $TAG_NAME from upstream..."
-          git fetch upstream tag "$TAG_NAME"
+          git fetch upstream tag "$TAG_NAME" --force
           
           # Checkout the tag forcefully (overwriting current workflow file if it doesn't exist in tag)
           echo "Checking out $TAG_NAME..."
