@@ -66,6 +66,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Save Config
+        run: cp nfpm.yaml /tmp/nfpm.yaml
+
       - name: Checkout and Build Target
         run: |
           TAG_NAME="${{ needs.sync-upstream.outputs.tag_name }}"
@@ -93,7 +96,10 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Build and Package Binaries
+      - name: Install nFPM
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+
+      - name: Build, Package and Bundle
         run: |
           # Build static binaries for both architectures
           make binary-remote-amd64
@@ -101,18 +107,47 @@ jobs:
           
           mkdir -p dist
           
-          # Package AMD64
+          # Restore nFPM config
+          cp /tmp/nfpm.yaml .
+          
+          # Extract version from tag (remove 'v' prefix)
+          VERSION="${{ needs.sync-upstream.outputs.tag_name }}"
+          VERSION="${VERSION#v}"
+          export VERSION
+          
+          # --- AMD64 ---
+          echo "Packaging AMD64..."
           cp bin/remote/prometheus-podman-exporter-amd64 podman_exporter
+          
+          # Tarball
           tar -czvf dist/podman_exporter-linux-amd64.tar.gz podman_exporter LICENSE
           
-          # Package ARM64
+          # DEB/RPM
+          export ARCH=amd64
+          nfpm pkg --packager deb --target dist/
+          nfpm pkg --packager rpm --target dist/
+
+          # --- ARM64 ---
+          echo "Packaging ARM64..."
           cp bin/remote/prometheus-podman-exporter-arm64 podman_exporter
+          
+          # Tarball
           tar -czvf dist/podman_exporter-linux-arm64.tar.gz podman_exporter LICENSE
+          
+          # DEB/RPM
+          export ARCH=arm64
+          nfpm pkg --packager deb --target dist/
+          nfpm pkg --packager rpm --target dist/
+          
+          ls -l dist/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.tar.gz
+          files: |
+            dist/*.tar.gz
+            dist/*.rpm
+            dist/*.deb
           make_latest: true
           tag_name: ${{ needs.sync-upstream.outputs.tag_name }}
         env:
